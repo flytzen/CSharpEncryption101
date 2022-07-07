@@ -1,0 +1,266 @@
+#!markdown
+
+# C# Encryption 101
+The very basics you need to avoid doing encryption wrong
+
+#!markdown
+
+## Introduction
+
+#!markdown
+
+<table>
+<tr>
+<td><img src="https://www.lytzen.name/assets/franslytzenpicture.jpg"/></td>
+<td>Moving software to the cloud since 2006.
+
+CTO and CISO at NewOrbit; architecting and implementing large and small-scale software for our customers, all running on Microsoft Azure.
+
+Helping other development organisations make the most of Azure through being an Azure Gold Partner and Reseller (“Direct CSP” in the parlance).
+
+Obsessed with security, performance and scalability. Also, penny-pincher in the cloud.</td>
+</tr>
+</table>
+
+----
+We help organisations make the most of Azure. One of the things we do is Security Reviews on what people do in the cloud and sometimes that involves looking at code that encrypts data. The honest truth is that the encryption functionality in C# is not userfriendly and people make mistakes with it all the time. 
+
+---
+
+### I asked on Twitter if there was an appetite for this talk
+
+<iframe id="twitter-widget-0" scrolling="no" frameborder="0" allowtransparency="true" allowfullscreen="true" class="" style="width: 550px; height: 361px; " title="Twitter Tweet" src="https://platform.twitter.com/embed/Tweet.html?dnt=false&amp;embedId=twitter-widget-0&amp;features=eyJ0ZndfdHdlZXRfZWRpdF9iYWNrZW5kIjp7ImJ1Y2tldCI6Im9mZiIsInZlcnNpb24iOm51bGx9LCJ0ZndfcmVmc3JjX3Nlc3Npb24iOnsiYnVja2V0Ijoib2ZmIiwidmVyc2lvbiI6bnVsbH0sInRmd190d2VldF9yZXN1bHRfbWlncmF0aW9uXzEzOTc5Ijp7ImJ1Y2tldCI6InR3ZWV0X3Jlc3VsdCIsInZlcnNpb24iOm51bGx9LCJ0Zndfc2Vuc2l0aXZlX21lZGlhX2ludGVyc3RpdGlhbF8xMzk2MyI6eyJidWNrZXQiOiJpbnRlcnN0aXRpYWwiLCJ2ZXJzaW9uIjpudWxsfSwidGZ3X2V4cGVyaW1lbnRzX2Nvb2tpZV9leHBpcmF0aW9uIjp7ImJ1Y2tldCI6MTIwOTYwMCwidmVyc2lvbiI6bnVsbH0sInRmd19kdXBsaWNhdGVfc2NyaWJlc190b19zZXR0aW5ncyI6eyJidWNrZXQiOiJvZmYiLCJ2ZXJzaW9uIjpudWxsfSwidGZ3X3VzZXJfZm9sbG93X2ludGVudF8xNDQwNiI6eyJidWNrZXQiOiJmb2xsb3ciLCJ2ZXJzaW9uIjpudWxsfSwidGZ3X3R3ZWV0X2VkaXRfZnJvbnRlbmQiOnsiYnVja2V0Ijoib2ZmIiwidmVyc2lvbiI6bnVsbH19&amp;frame=false&amp;hideCard=false&amp;hideThread=false&amp;id=1544268086076907521&amp;lang=en&amp;origin=https%3A%2F%2Fpublish.twitter.com%2F%3Fquery%3Dhttps%253A%252F%252Ftwitter.com%252Fflytzen%252Fstatus%252F1544268086076907521%26widget%3DTweet&amp;sessionId=59e9c3c5a849f572513093364300882fb644a37f&amp;theme=light&amp;widgetsVersion=b45a03c79d4c1%3A1654150928467&amp;width=550px" data-tweet-id="1544268086076907521"></iframe>
+
+#!markdown
+
+## It's bytes all the way
+
+#!markdown
+
+Encryption functions are *maths* functions - they operate on numbers. They don't really understand things such as text, which is why all the inputs and outputs are *byte arrays* because they can all be treated as, and be broken into, *numbers* of differing sizes. This includes the encryption key, the payload and the encrypted content. 
+
+#!markdown
+
+### A little detour into text and bytes and streams
+
+#!markdown
+
+This is a big subject - I can only give you the very basics here.
+
+#!markdown
+
+#### Text has to be converted to and from bytes using a specific encoding standard
+
+#!markdown
+
+- Basically, a particular byte (or sequence of bytes) in a file or sent over the wire may refer to *different* letters, depending on the standard
+- If in doubt, use UTF-8.
+- Your string variable is, of course, internally stored as a sequence of bytes - but it's (effectively) UTF-16, which you probably don't want to use.
+
+#!markdown
+
+### Streams are kinda similar to byte arrays (at least for our purpose today)
+
+#!markdown
+
+- They both "hold" a sequence of bytes
+- You can usually just keep writing to Stream, wheras you have to pre-declare the length of a byte array
+- Streams *may* be "forward only"
+- Streams are a very broad abstraction that covers too many things
+
+#!markdown
+
+### Back to the bytes
+
+#!markdown
+
+#### It looks a bit like this when you remove the nice syntactical sugar:
+
+#!csharp
+
+// This code is not tested, and will probably not work and you almost certainly shouldn't use it as-is!!
+using System;
+using System.Security.Cryptography;
+
+var key = new byte[32] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31 };
+var input = new byte[16] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
+var outputLength = (((input.Length / 16) + 1) * 16);
+var output = new byte[outputLength];
+
+using (var aes = Aes.Create())
+{
+    var encryptor = aes.CreateEncryptor();
+
+    var inputLength = input.Length;
+    var initialBlocks = (inputLength - 1) / 16;  
+    for (int i = 0; i < initialBlocks; i++)
+    {
+        var position = i * 16;
+        encryptor.TransformBlock(input, position, 16, output, position);
+    }
+
+    var finalBlockStart = initialBlocks * 16;
+    var finalBlockLength = inputLength - (initialBlocks * 16);
+    var finalBlock = encryptor.TransformFinalBlock(input, finalBlockStart, finalBlockLength);
+
+    finalBlock.CopyTo(output, finalBlockStart);
+}
+
+#!markdown
+
+#### That's rather ugly, so in practice you would tend to do something more like this. 
+
+#!csharp
+
+// This example encrypts text held in memory! If your data is already in binary format - or just in a file - you can do it a little bit simpler
+// Most of the layers here are about converting between binary and string formats! The crypto part is simpler. I'll come back to that.
+using System.Security.Cryptography;
+using System.IO;
+
+var key = Encoding.ASCII.GetBytes("MySuperSecretKeyThatIs32BytesLon"); // Using text to create a key as bytes - not ideal!
+var data = "Hello Ægir 个 😮";
+
+byte[] encryptedBytes;
+
+using (var aes = Aes.Create())
+using (var encryptor = aes.CreateEncryptor(key, aes.IV)) // Provide your own key, but use the generated IV
+using (var encryptedStream = new MemoryStream())
+using (var cryptoStream = new CryptoStream(encryptedStream, encryptor, CryptoStreamMode.Write))
+using (var streamWriter = new StreamWriter(encryptedStream, Encoding.UTF8)) // This handles converting your data from text to bytes
+{
+    cryptoStream.Write(aes.IV, 0, aes.IV.Length); // Write the IV to the stream
+    streamWriter.Write(data); // Encrypt the data
+    streamWriter.Flush();
+    cryptoStream.FlushFinalBlock();
+    encryptedBytes = encryptedStream.ToArray();
+}
+
+#!markdown
+
+## Symmetric or Asymetric encryption?
+
+#!markdown
+
+- Symmetric means you use the same key for encryption and decryption
+    -  It is very fast and can handle large volumes of data
+- Assymetric encryption uses different keys for encryption and decryption
+    - It is slow and, in practice, can only encrypt very small bits of data
+    - It has many other cryptographic uses
+
+#### For encrypting data, use symmetric encryption
+In the bonus content I will explain how you can combine them.
+
+#!markdown
+
+## Use AES for symmetric Encryption
+
+#!markdown
+
+- AES is the symmetric encryption algorithm you should use by default. There may be reasons to use others for specific purposes, but that is not in the scope of this talk.
+
+- AES uses Rijndael - yes. But that doesn't mean you should directly use Rijndael. In fact, it has now been marked as obsolete. Use AES directly and let .Net handle the defaults.
+
+#!markdown
+
+**Don't do this:**
+
+#!csharp
+
+using System.Security.Cryptography;
+
+var rijndaelEncryptoer = Rijndael.Create();
+
+#!markdown
+
+**Do this:**
+
+#!csharp
+
+using System.Security.Cryptography;
+
+var encryptor = Aes.Create();
+
+#!markdown
+
+## Leave the default AES settings alone
+
+#!markdown
+
+Unfortunately, the C# implementation of AES allows you to play with all the sharp knives. Do *not* change the defaults - Microsoft have already set them to their recommended values.
+![juggling knives](http://ih2.redbubble.net/image.3341510.9236/flat,550x550,075,f.jpg)
+
+#!markdown
+
+*Bad*:
+
+#!csharp
+
+using System.Security.Cryptography;
+
+using (var aes = Aes.Create())
+{
+    aes.BlockSize = 128;
+    aes.Mode = CipherMode.ECB;
+    aes.Padding = PaddingMode.ANSIX923;
+    //.... do encryption work
+}
+
+#!markdown
+
+*Good*:
+
+#!csharp
+
+using System.Security.Cryptography;
+
+using (var aes = Aes.Create())
+{
+    //.... do encryption work
+}
+
+#!markdown
+
+## Keep that IV value
+
+#!markdown
+
+## Examples
+
+#!markdown
+
+### Binary Encryption
+
+#!markdown
+
+### Text encryption
+
+#!markdown
+
+# Bonus content
+
+#!markdown
+
+## Use the envelope method
+
+#!markdown
+
+## Authenticated Encryption
+
+#!markdown
+
+## Shameless plug #1
+
+#!markdown
+
+## Shameless plug #2
+
+#!markdown
+
+## References
+
+#!markdown
+
+- [Security Driven .Net](https://securitydriven.net/) book. An oldie but still awesome.
+- [Applied Cryptography in .NET and Azure Key Vault](https://www.apress.com/us/applied-cryptography-in--net-and-azure-key-vault/16427394) book
+- [Characters, Symbols and the Unicode Miracle - Computerphile](https://www.youtube.com/watch?v=MijmeoH9LT4) - video explaining UTF text encoding
+- [C# In depth - Unicode](https://www.csharpindepth.com/articles/Unicode) - excellent description of the whole text encoding thing
