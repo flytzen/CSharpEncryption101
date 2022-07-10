@@ -1,2 +1,5 @@
 .vscode
 temp
+input.txt
+decrypted.txt
+encrypted.bin

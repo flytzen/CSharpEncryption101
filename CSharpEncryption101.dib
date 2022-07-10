@@ -41,6 +41,12 @@ Encryption functions are *maths* functions - they operate on numbers. They don't
 
 #!markdown
 
+Having a decent understanding of byte arrays, streams *and stream writers* as well as how to convert between text and bytes is essential to be able to use the encryption APIs well.
+
+<img src="assets/byte.jpg" style="width:400px" />
+
+#!markdown
+
 ### A little detour into text and bytes and streams
 
 #!markdown
@@ -56,6 +62,22 @@ This is a big subject - I can only give you the very basics here.
 - Basically, a particular byte (or sequence of bytes) in a file or sent over the wire may refer to *different* letters, depending on the standard
 - If in doubt, use UTF-8.
 - Your string variable is, of course, internally stored as a sequence of bytes - but it's (effectively) UTF-16, which you probably don't want to use.
+
+#!csharp
+
+var data = "Hello Ægir 个 😮";
+
+var asciiBytes = Encoding.ASCII.GetBytes(data);
+var utf8Bytes = Encoding.UTF8.GetBytes(data);
+var utf16Bytes = Encoding.Unicode.GetBytes(data);
+
+Console.WriteLine("ASCII: {0}", BitConverter.ToString(asciiBytes));
+Console.WriteLine("UTF8:  {0}", BitConverter.ToString(utf8Bytes));
+Console.WriteLine("UTF16: {0}", BitConverter.ToString(utf16Bytes));
+Console.WriteLine("-----------------------");
+Console.WriteLine("ASCII: {0}", Encoding.ASCII.GetString(asciiBytes));
+Console.WriteLine("UTF8:  {0}", Encoding.UTF8.GetString(utf8Bytes));
+Console.WriteLine("UTF16: {0}", Encoding.Unicode.GetString(utf16Bytes));
 
 #!markdown
 
@@ -187,7 +209,8 @@ var encryptor = Aes.Create();
 #!markdown
 
 Unfortunately, the C# implementation of AES allows you to play with all the sharp knives. Do *not* change the defaults - Microsoft have already set them to their recommended values.
-![juggling knives](http://ih2.redbubble.net/image.3341510.9236/flat,550x550,075,f.jpg)
+
+<img src="assets/knives.jpg" />
 
 #!markdown
 
